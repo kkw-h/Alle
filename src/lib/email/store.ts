@@ -1,6 +1,7 @@
 import emailDB from "@/lib/db/email";
 import extract from "./extract";
 import sendWebhook from '@/lib/webhook/webhook'
+import sendTelegramMessage from '@/lib/telegram/telegram'
 import PostalMime from "postal-mime";
 import * as cheerio from 'cheerio';
 import type { Email, NewEmail } from "@/types";
@@ -70,12 +71,22 @@ export default async function storeEmail(
             emailResult: result.result || "",
             emailResultText: result.result_text || "",
             emailError: null,
+            readStatus: 0,
         };
 
         const res = await emailDB.create(env, emailData);
 
         if (env.WEBHOOK_URL && env.WEBHOOK_TEMPLATE && env.WEBHOOK_TYPE.split(',').includes(emailData.emailType)) {
             await sendWebhook(replaceTemplateAdvanced(env.WEBHOOK_TEMPLATE, res), env.WEBHOOK_URL);
+        }
+
+        // 发送到Telegram Bot
+        if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID && env.TELEGRAM_TEMPLATE && env.TELEGRAM_TYPE && env.TELEGRAM_TYPE.split(',').includes(emailData.emailType)) {
+            await sendTelegramMessage(
+                replaceTemplateAdvanced(env.TELEGRAM_TEMPLATE, res),
+                env.TELEGRAM_BOT_TOKEN,
+                env.TELEGRAM_CHAT_ID
+            );
         }
         console.log("Email stored successfully:", {
             id: res.id,
